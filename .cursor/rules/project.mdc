@@ -1,0 +1,12 @@
+---
+description: Project context for work-time-clock
+alwaysApply: true
+---
+
+# work-time-clock
+
+This repository is a work time clock project.
+
+- Prefer small, focused changes.
+- Do not invent product requirements; ask when they are missing.
+- Keep project rules and commands in `.cursor/` so they stay versioned with the repo.
