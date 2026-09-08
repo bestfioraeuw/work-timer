@@ -7,6 +7,7 @@ import json
 import os
 import socket
 import sqlite3
+import subprocess
 import sys
 import webbrowser
 from datetime import date, datetime, timedelta
@@ -540,17 +541,32 @@ def listening() -> bool:
         return False
 
 
+def page_url() -> str:
+    host = "127.0.0.1" if HOST in ("0.0.0.0", "::") else HOST
+    return f"http://{host}:{PORT}/"
+
+
+def open_page(url: str) -> None:
+    if sys.platform == "darwin":
+        try:
+            subprocess.Popen(["open", url])
+            return
+        except OSError:
+            pass
+    webbrowser.open(url)
+
+
 def main() -> None:
-    url = f"http://{HOST}:{PORT}/"
+    url = page_url()
     want_open = "--open" in sys.argv
     if listening():
         if want_open:
-            webbrowser.open(url)
+            open_page(url)
         return
     connect().close()
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     if want_open:
-        webbrowser.open(url)
+        open_page(url)
     server.serve_forever()
 
 

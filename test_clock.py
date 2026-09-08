@@ -118,9 +118,26 @@ def test_http_roundtrip() -> None:
             server.shutdown()
 
 
+def test_page_url_and_launcher() -> None:
+    old = app.HOST
+    try:
+        app.HOST = "0.0.0.0"
+        assert app.page_url() == f"http://127.0.0.1:{app.PORT}/"
+        app.HOST = "127.0.0.1"
+        assert app.page_url() == f"http://127.0.0.1:{app.PORT}/"
+    finally:
+        app.HOST = old
+    script = Path(__file__).resolve().parent / "start.command"
+    raw = script.read_bytes()
+    assert raw.startswith(b"#!/bin/sh\n")
+    assert b"\r" not in raw
+    assert b"app.py --open" in raw
+
+
 if __name__ == "__main__":
     test_minutes_and_export()
     test_reset_and_calibrate()
     test_work_and_rest_modes()
     test_http_roundtrip()
+    test_page_url_and_launcher()
     print("ok")

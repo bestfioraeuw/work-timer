@@ -8,19 +8,31 @@
 
 机器上已装 Python 3 即可。默认地址：[http://127.0.0.1:8765/](http://127.0.0.1:8765/)
 
-**Windows（推荐）**
+**Windows**
 
 双击 `start.bat`。它会在后台启动服务并打开浏览器。若端口已被占用，只会打开已在跑的页面。
 
-`start.bat` 通过 `clock.vbs` 调用 `C:\Program Files\Python312\pythonw.exe`。若本机 Python 不在这个路径，改用下面这条命令。
+`start.bat` 通过 `clock.vbs` 调用 `C:\Program Files\Python312\pythonw.exe`。若本机 Python 不在这个路径，改用下面的命令。
 
-**任意系统**
+**macOS**
+
+双击 `start.command`。效果和 Windows 一样：后台启动、打开浏览器；端口已被占用则只打开页面。
+
+第一次可能被拦截：右键文件 → 打开。若提示无权限，在终端执行：
 
 ```bash
-python app.py --open
+chmod +x start.command
 ```
 
-不加 `--open` 只启动服务，不自动开浏览器。再次执行带 `--open` 时，若服务已在跑，只会打开页面。
+脚本会按顺序找 `.venv`、Homebrew、系统自带的 `python3`。Finder 启动时 PATH 很短，不要依赖「终端里能跑的 `python3`」。
+
+**任意系统（终端）**
+
+```bash
+python3 app.py --open
+```
+
+Windows 上也可以写成 `python app.py --open`。不加 `--open` 只启动服务，不自动开浏览器。再次执行带 `--open` 时，若服务已在跑，只会打开页面。
 
 **Docker**
 
@@ -62,6 +74,7 @@ python test_clock.py
 | `app.py` | 服务与打卡逻辑 |
 | `static/` | 页面与时段图片 |
 | `start.bat` / `clock.vbs` | Windows 一键启动 |
+| `start.command` | macOS 一键启动 |
 | `compose.yaml` / `Dockerfile` | 容器运行 |
 | `test_clock.py` | 测试 |
 | `DESIGN.md` | 界面设计约定 |
