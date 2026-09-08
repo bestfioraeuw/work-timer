@@ -9,4 +9,5 @@ This repository is a work time clock project.
 
 - Prefer small, focused changes.
 - Do not invent product requirements; ask when they are missing.
+- Frontend UI must follow `DESIGN.md`.
 - Keep project rules and commands in `.cursor/` so they stay versioned with the repo.

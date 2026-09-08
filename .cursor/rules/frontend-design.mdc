@@ -1,0 +1,22 @@
+---
+description: Frontend must follow DESIGN.md
+globs: **/*.{html,css,js,ts,tsx,jsx,vue}
+alwaysApply: true
+---
+
+# Frontend design
+
+Read `DESIGN.md` before writing or changing any UI. Implement it; do not invent a parallel look.
+
+Non-negotiables:
+
+- One accent: `{colors.primary}` `#0066cc`. Dark-tile links use `{colors.primary-on-dark}` `#2997ff` only.
+- No second brand color. No decorative gradients. No card/button/text shadows.
+- The only drop-shadow is `rgba(0, 0, 0, 0.22) 3px 5px 30px` on product imagery.
+- Body is 17px / 400 / 1.47. Headlines are 600 with negative letter-spacing. No weight 500.
+- Primary actions are `{rounded.pill}` blue pills. Press = `transform: scale(0.95)`.
+- Sections are full-bleed tiles. Alternate white/parchment and near-black; the color change is the divider.
+- Map UI to named components in `DESIGN.md` (`global-nav`, `product-tile-*`, `button-primary`, `store-utility-card`).
+- Use design tokens, not ad-hoc hex/radius/type.
+
+If a screen is not specified, pick the closest component in `DESIGN.md` and stay inside its tokens.

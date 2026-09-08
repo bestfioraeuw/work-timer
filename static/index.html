@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>工作钟</title>
+  <script>
+    (function () {
+      var h = new Date().getHours();
+      var p = h >= 5 && h < 11 ? "morning" : h >= 11 && h < 14 ? "noon" : h >= 14 && h < 18 ? "afternoon" : "night";
+      document.documentElement.setAttribute("data-period", p);
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --colors-primary: #0066cc;
+      --colors-primary-focus: #0071e3;
+      --colors-primary-on-dark: #2997ff;
+      --colors-on-primary: #ffffff;
+      --colors-canvas: #ffffff;
+      --colors-canvas-parchment: #f5f5f7;
+      --colors-surface-pearl: #fafafc;
+      --colors-surface-tile-1: #272729;
+      --colors-surface-tile-2: #2a2a2c;
+      --colors-surface-black: #000000;
+      --colors-ink: #1d1d1f;
+      --colors-body: #1d1d1f;
+      --colors-body-on-dark: #ffffff;
+      --colors-body-muted: #cccccc;
+      --colors-ink-muted-80: #333333;
+      --colors-ink-muted-48: #7a7a7a;
+      --colors-hairline: #e0e0e0;
+      --colors-divider-soft: rgba(0, 0, 0, 0.04);
+      --rounded-none: 0;
+      --rounded-sm: 8px;
+      --rounded-md: 11px;
+      --rounded-lg: 18px;
+      --rounded-pill: 9999px;
+      --spacing-xs: 8px;
+      --spacing-sm: 12px;
+      --spacing-md: 17px;
+      --spacing-lg: 24px;
+      --spacing-xl: 32px;
+      --spacing-xxl: 48px;
+      --spacing-section: 80px;
+      --font-display: "SF Pro Display", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-text: "SF Pro Text", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      font-family: var(--font-text);
+      font-feature-settings: "ss03";
+      font-size: 17px;
+      font-weight: 400;
+      line-height: 1.44;
+      letter-spacing: -0.374px;
+      color: var(--colors-body);
+      background: var(--colors-canvas);
+    }
+    body.booting .tile,
+    body.booting .sub-nav,
+    body.booting .footer,
+    body.booting #export { opacity: 0; }
+    body.welcome { overflow: hidden; }
+    body.welcome .tile-hero { min-height: calc(100vh - 44px); }
+    body.welcome .desk-reveal {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      margin: 0;
+      overflow: hidden;
+      border: 0;
+    }
+    body.welcome .sub-nav { height: 0; min-height: 0; }
+    body.welcome .desk-only,
+    body.welcome #export { display: none !important; }
+    body.welcome:not(.booting) .tile-hero {
+      animation: welcome-in 0.8s ease both;
+    }
+    body.desk .desk-reveal { opacity: 1; visibility: visible; }
+    body.is-entering .tile-hero {
+      animation: hero-settle 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    body.is-entering .desk-reveal {
+      animation: rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    body.is-entering .sub-nav { animation-name: fade; animation-duration: 0.5s; }
+    body.is-entering #segTile { animation-delay: 0.1s; }
+    body.is-entering .tile-utility { animation-delay: 0.22s; }
+    body.is-entering .tile-note { animation-delay: 0.34s; }
+    body.is-entering .footer { animation-delay: 0.46s; }
+    body.is-entering .desk-only {
+      animation: rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+    }
+    @keyframes welcome-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes hero-settle {
+      from { min-height: calc(100vh - 44px); }
+      to { min-height: calc(100vh - 96px); }
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(28px); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes fade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    button, input, textarea { font: inherit; }
+    :focus-visible { outline: 2px solid var(--colors-primary-focus); outline-offset: 2px; }
+    .global-nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      height: 44px;
+      background: var(--colors-surface-black);
+      color: var(--colors-body-on-dark);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 22px;
+    }
+    .global-nav a, .nav-brand {
+      color: var(--colors-body-on-dark);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 400;
+      letter-spacing: -0.12px;
+      line-height: 1;
+    }
+    .sub-nav {
+      position: sticky;
+      top: 44px;
+      z-index: 19;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--spacing-lg);
+      padding: 0 22px;
+      background: rgba(245, 245, 247, 0.8);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    }
+    .sub-nav h2 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 21px;
+      font-weight: 600;
+      line-height: 1.19;
+      letter-spacing: 0.231px;
+    }
+    .date-row { display: flex; align-items: center; gap: 20px; }
+    .text-link {
+      background: none;
+      border: 0;
+      padding: 0;
+      color: var(--colors-primary);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: -0.224px;
+      line-height: 1.29;
+      min-height: 44px;
+    }
+    .text-link:disabled { color: var(--colors-ink-muted-48); cursor: not-allowed; }
+    .search-input {
+      height: 44px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: var(--rounded-pill);
+      background: var(--colors-canvas);
+      color: var(--colors-ink);
+      padding: 12px 20px;
+      min-width: 11.5rem;
+    }
+    .tile {
+      border-radius: var(--rounded-none);
+      padding: var(--spacing-section) 24px;
+    }
+    .tile-inner {
+      max-width: 980px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .tile-hero,
+    .tile-hero.tile-dark {
+      position: relative;
+      isolation: isolate;
+      background-color: var(--colors-surface-tile-1);
+      background-image: url("/img/period-morning.jpg");
+      background-size: cover;
+      background-position: center 42%;
+      min-height: calc(100vh - 96px);
+      display: flex;
+      align-items: center;
+      color: var(--colors-body-on-dark);
+    }
+    html[data-period="noon"] .tile-hero,
+    html[data-period="noon"] .tile-hero.tile-dark {
+      background-image: url("/img/period-noon.jpg");
+      background-position: center 48%;
+    }
+    html[data-period="afternoon"] .tile-hero,
+    html[data-period="afternoon"] .tile-hero.tile-dark {
+      background-image: url("/img/period-afternoon.jpg");
+      background-position: center 58%;
+    }
+    html[data-period="night"] .tile-hero,
+    html[data-period="night"] .tile-hero.tile-dark {
+      background-image: url("/img/period-night.jpg");
+      background-position: center 22%;
+    }
+    .tile-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(29, 29, 31, 0.42);
+      pointer-events: none;
+      z-index: 0;
+    }
+    body.welcome .tile-hero::before { background: rgba(29, 29, 31, 0.28); }
+    html[data-period="noon"] .tile-hero::before { background: rgba(16, 28, 46, 0.46); }
+    html[data-period="noon"] body.welcome .tile-hero::before { background: rgba(16, 28, 46, 0.34); }
+    html[data-period="afternoon"] .tile-hero::before { background: rgba(29, 29, 31, 0.44); }
+    html[data-period="night"] .tile-hero::before { background: rgba(0, 0, 0, 0.28); }
+    html[data-period="night"] body.welcome .tile-hero::before { background: rgba(0, 0, 0, 0.16); }
+    .tile-hero.tile-dark::before { background: rgba(25, 25, 27, 0.55); }
+    html[data-period="night"] .tile-hero.tile-dark::before { background: rgba(0, 0, 0, 0.4); }
+    .tile-hero .tile-inner { position: relative; z-index: 1; }
+    .tile-hero .lead { color: var(--colors-body-muted); }
+    .tile-hero .live { color: var(--colors-body-muted); }
+    .tile-hero .err { color: var(--colors-body-on-dark); }
+    .tile-hero .calibrate label { color: var(--colors-body-muted); }
+    .tile-hero .button-secondary-pill {
+      color: var(--colors-primary-on-dark);
+      border-color: var(--colors-primary-on-dark);
+    }
+    .tile-hero.is-focus { min-height: calc(100vh - 96px); }
+    .tile-hero.is-focus .calibrate { display: none; }
+    .tile-dark { background: var(--colors-surface-tile-1); color: var(--colors-body-on-dark); }
+    .tile-dark-2 { background: var(--colors-surface-tile-2); color: var(--colors-body-on-dark); }
+    .tile-utility { background: var(--colors-canvas-parchment); }
+    .tile-note { background: var(--colors-canvas); }
+    .tile h1, .tile h2 {
+      margin: 0 0 12px;
+      font-family: var(--font-display);
+      font-weight: 600;
+    }
+    .display-lg {
+      font-size: 40px;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+    }
+    .lead {
+      margin: 0 0 48px;
+      font-size: 28px;
+      font-weight: 400;
+      line-height: 1.14;
+      letter-spacing: 0.196px;
+      color: var(--colors-ink);
+    }
+    .tile-dark .lead { color: var(--colors-body-muted); }
+    .clock {
+      margin: 0 0 16px;
+      font-family: var(--font-display);
+      font-size: 56px;
+      font-weight: 600;
+      line-height: 1.07;
+      letter-spacing: -0.28px;
+      font-variant-numeric: tabular-nums;
+    }
+    .hidden { display: none !important; }
+    .kind-rest { color: var(--colors-body-muted); }
+    .live {
+      min-height: 1.47em;
+      margin: 0 0 48px;
+      color: var(--colors-ink-muted-48);
+    }
+    .tile-dark .live { color: var(--colors-body-muted); }
+    .actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; }
+    .calibrate {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 12px;
+      margin-top: 48px;
+    }
+    .calibrate label {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: -0.224px;
+      color: var(--colors-ink-muted-48);
+    }
+    .calibrate .search-input { min-width: 8.5rem; }
+    .button-primary,
+    .button-secondary-pill {
+      min-height: 44px;
+      padding: 11px 22px;
+      border-radius: var(--rounded-pill);
+      cursor: pointer;
+      font-size: 17px;
+      font-weight: 400;
+      letter-spacing: -0.374px;
+    }
+    .button-primary {
+      border: 0;
+      background: var(--colors-primary);
+      color: var(--colors-on-primary);
+    }
+    .button-secondary-pill {
+      background: transparent;
+      color: var(--colors-primary);
+      border: 1px solid var(--colors-primary);
+    }
+    .tile-dark .button-secondary-pill {
+      color: var(--colors-primary-on-dark);
+      border-color: var(--colors-primary-on-dark);
+    }
+    .button-primary:active,
+    .button-secondary-pill:active,
+    .text-link:active { transform: scale(0.95); }
+    .button-primary:disabled,
+    .button-secondary-pill:disabled {
+      color: var(--colors-ink-muted-48);
+      background: var(--colors-surface-pearl);
+      border-color: var(--colors-divider-soft);
+      cursor: not-allowed;
+      transform: none;
+    }
+    .tile-dark .button-primary:disabled,
+    .tile-dark .button-secondary-pill:disabled,
+    .tile-hero .button-primary:disabled,
+    .tile-hero .button-secondary-pill:disabled {
+      background: var(--colors-surface-tile-2);
+      color: var(--colors-body-muted);
+      border-color: transparent;
+    }
+    .err {
+      margin: 0 0 24px;
+      color: var(--colors-ink);
+      min-height: 0;
+    }
+    .tile-dark .err { color: var(--colors-body-on-dark); }
+    .task-row {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 0 0 24px;
+    }
+    .task-row .search-input { flex: 1 1 240px; max-width: 420px; }
+    .segs {
+      list-style: none;
+      margin: 40px auto 0;
+      padding: 0;
+      max-width: 640px;
+      text-align: left;
+    }
+    .segs li {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--colors-body-on-dark);
+    }
+    .segs li:first-child { border-top: 0; }
+    .empty { color: var(--colors-body-muted); text-align: center; border: 0; justify-content: center; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+    .store-utility-card {
+      background: var(--colors-canvas);
+      border: 1px solid var(--colors-hairline);
+      border-radius: var(--rounded-lg);
+      padding: var(--spacing-lg);
+      text-align: left;
+    }
+    .store-utility-card label {
+      display: block;
+      margin: 0 0 8px;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: -0.224px;
+      color: var(--colors-ink-muted-48);
+    }
+    .store-utility-card b {
+      font-size: 28px;
+      font-weight: 400;
+      line-height: 1.14;
+      letter-spacing: 0.196px;
+      font-variant-numeric: tabular-nums;
+    }
+    .tile-note .tile-inner { text-align: left; max-width: 980px; }
+    textarea {
+      width: 100%;
+      min-height: 280px;
+      resize: vertical;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: var(--colors-ink);
+      outline: none;
+    }
+    .fine {
+      margin: 16px 0 0;
+      font-size: 12px;
+      line-height: 1;
+      letter-spacing: -0.12px;
+      color: var(--colors-ink-muted-48);
+    }
+    .footer {
+      background: var(--colors-canvas-parchment);
+      color: var(--colors-ink-muted-80);
+      padding: 64px 24px;
+      font-size: 12px;
+      letter-spacing: -0.12px;
+    }
+    .footer-inner { max-width: 980px; margin: 0 auto; }
+    @media (max-width: 1068px) {
+      .display-lg { font-size: 40px; }
+      .clock { font-size: 40px; }
+    }
+    @media (max-width: 834px) {
+      .stats { grid-template-columns: 1fr 1fr; }
+      .sub-nav { height: auto; padding: 10px 16px; }
+      .date-row { gap: 8px; }
+    }
+    @media (max-width: 640px) {
+      .tile { padding: 48px 16px; }
+      .display-lg { font-size: 34px; }
+      .lead { font-size: 21px; }
+      .clock { font-size: 34px; }
+      .stats { grid-template-columns: 1fr; }
+      .search-input { min-width: 0; width: 100%; }
+    }
+    @media (max-width: 419px) {
+      .display-lg, .clock { font-size: 28px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .button-primary:active,
+      .button-secondary-pill:active,
+      .text-link:active { transform: none; }
+      body.welcome:not(.booting) .tile-hero,
+      body.is-entering .tile-hero,
+      body.is-entering .desk-reveal,
+      body.is-entering .desk-only { animation: none; }
+      .tile-hero { transition: none; }
+    }
+  </style>
+</head>
+<body class="booting welcome">
+  <header class="global-nav">
+    <span class="nav-brand">工作钟</span>
+    <button id="export" class="button-primary" type="button">导出今年</button>
+  </header>
+  <nav class="sub-nav desk-reveal">
+    <h2 id="dayLabel">今日</h2>
+    <div class="date-row">
+      <button id="prev" class="text-link" type="button">前一天</button>
+      <input id="date" class="search-input" type="date" />
+      <button id="next" class="text-link" type="button">后一天</button>
+    </div>
+  </nav>
+
+  <section class="tile tile-hero" id="hero">
+    <div class="tile-inner">
+      <p class="err" id="err"></p>
+      <h1 class="display-lg" id="heroTitle">早上好</h1>
+      <p class="lead" id="heroLead">先打卡，再开始今天。</p>
+      <p class="clock" id="punchRange">00:00:00</p>
+      <p class="live" id="punchLive"></p>
+      <div class="task-row desk-only" id="taskRow">
+        <input id="task" class="search-input" type="text" placeholder="正在做什么" maxlength="80" />
+      </div>
+      <div class="actions">
+        <button id="in" class="button-primary" type="button">上班打卡</button>
+        <button id="startWork" class="button-primary desk-only" type="button">开始工作</button>
+        <button id="startRest" class="button-secondary-pill desk-only" type="button">去休息</button>
+        <button id="out" class="button-secondary-pill desk-only" type="button">下班</button>
+      </div>
+      <div class="calibrate desk-only" id="calibrateRow">
+        <label>上班<input id="inTime" class="search-input" type="time" /></label>
+        <label>下班<input id="outTime" class="search-input" type="time" /></label>
+        <button id="calibrate" class="button-primary" type="button">校准</button>
+        <button id="resetOut" class="button-secondary-pill" type="button">重置下班</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="tile tile-dark desk-reveal" id="segTile">
+    <div class="tile-inner">
+      <h2 class="display-lg">今天的段落</h2>
+      <p class="lead">工作一段、休息一段，都算上班。</p>
+      <p class="live" id="segLive"></p>
+      <ul class="segs" id="segs"></ul>
+    </div>
+  </section>
+
+  <section class="tile tile-utility desk-reveal">
+    <div class="stats">
+      <article class="store-utility-card"><label>今日打卡</label><b id="todayPunch">0m</b></article>
+      <article class="store-utility-card"><label>今日工作</label><b id="todayWork">0m</b></article>
+      <article class="store-utility-card"><label>今日休息</label><b id="todayRest">0m</b></article>
+      <article class="store-utility-card"><label>本周打卡</label><b id="weekPunch">0m</b></article>
+    </div>
+  </section>
+
+  <section class="tile tile-note desk-reveal">
+    <div class="tile-inner">
+      <h2 class="display-lg">今日工作</h2>
+      <p class="lead">写给年底的自己。</p>
+      <textarea id="note" placeholder="今天做了什么、卡在哪、下一步"></textarea>
+      <p class="fine" id="saved">写完会自动保存。年底可一次导出，交给 AI 做年报。</p>
+    </div>
+  </section>
+
+  <footer class="footer desk-reveal">
+    <div class="footer-inner">记录留在这台电脑的 SQLite 里，不会上传。风景：上午 Scout Lake（Jsayre64，CC BY-SA 3.0）；中午 Mount Hood；下午 Walchensee；夜晚 Earthrise（NASA / Bill Anders，公有领域）。</div>
+  </footer>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const pad = (n) => String(n).padStart(2, "0");
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+    const todayISO = () => {
+      const d = new Date();
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+    const shiftDate = (iso, days) => {
+      const d = new Date(iso + "T00:00:00");
+      d.setDate(d.getDate() + days);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+    const fmtHm = (mins) => {
+      const h = Math.floor(Math.max(0, mins) / 60);
+      const m = Math.max(0, mins) % 60;
+      if (h && m) return `${h}h ${m}m`;
+      if (h) return `${h}h`;
+      return `${m}m`;
+    };
+    const secondsSince = (ts) => {
+      if (!ts) return 0;
+      return Math.max(0, Math.floor((Date.now() - new Date(ts.replace(" ", "T")).getTime()) / 1000));
+    };
+    const minutesSince = (ts) => Math.floor(secondsSince(ts) / 60);
+    const fmtHms = (ts) => {
+      const total = secondsSince(ts);
+      const h = Math.floor(total / 3600);
+      const m = Math.floor((total % 3600) / 60);
+      const s = total % 60;
+      return `${pad(h)}:${pad(m)}:${pad(s)}`;
+    };
+    const hhmm = (ts) => (ts ? ts.slice(11, 16) : "");
+    const lastWorkTask = () => {
+      const works = (day?.segments || []).filter((s) => s.kind !== "rest");
+      return works.length ? works[works.length - 1].task : "";
+    };
+    const periodOf = (h = new Date().getHours()) => {
+      if (h >= 5 && h < 11) return "morning";
+      if (h >= 11 && h < 14) return "noon";
+      if (h >= 14 && h < 18) return "afternoon";
+      return "night";
+    };
+    const LINES = {
+      morning: {
+        welcome: ["早上好", "先坐下来，把今天打开。"],
+        desk: ["上午就这样开始了", "先做一件事，或先歇一会儿。"],
+        done: ["上午到这儿了", "记下的都还在。"],
+      },
+      noon: {
+        welcome: ["中午好", "吃过再开始，也算今天。"],
+        desk: ["午饭前后，还在", "做一段，或先歇一会儿。"],
+        done: ["中午收工了", "记下的都还在。"],
+      },
+      afternoon: {
+        welcome: ["下午好", "下午这段，从打卡开始。"],
+        desk: ["下午还在继续", "选一段工作，或先休息。"],
+        done: ["下午收工了", "记下的都还在。"],
+      },
+      night: {
+        welcome: ["还没走？", "夜里到岗，也记一笔。"],
+        desk: ["夜里还在岗", "做一段，或先歇着。"],
+        done: ["夜里收工了", "记下的都还在。"],
+      },
+    };
+    const applyPeriod = () => {
+      const period = periodOf();
+      document.documentElement.setAttribute("data-period", period);
+      return LINES[period];
+    };
+    const greeting = () => applyPeriod().welcome[0];
+    const wallClock = () => {
+      const d = new Date();
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    };
+    const dateLine = (iso) => {
+      const d = new Date(iso + "T00:00:00");
+      return `${d.getMonth() + 1}月${d.getDate()}日 星期${"日一二三四五六"[d.getDay()]}`;
+    };
+
+    let day = null;
+    let stats = null;
+    let saveTimer = null;
+    let hydrated = false;
+    let enterFromPunch = false;
+    let enterTimer = null;
+
+    function setScene(name, animate) {
+      const welcome = name === "welcome";
+      document.body.classList.toggle("welcome", welcome);
+      document.body.classList.toggle("desk", !welcome);
+      document.body.classList.toggle("is-entering", Boolean(animate && !welcome));
+      document.body.classList.remove("booting");
+      clearTimeout(enterTimer);
+      if (animate && !welcome) {
+        enterTimer = setTimeout(() => {
+          document.body.classList.remove("is-entering");
+        }, 1200);
+        setTimeout(() => $("task").focus(), 360);
+      }
+    }
+
+    async function api(path, opts) {
+      const res = await fetch(path, opts);
+      const type = res.headers.get("content-type") || "";
+      if (!type.includes("json")) return res;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "请求失败");
+      return data;
+    }
+
+    async function refresh() {
+      const date = $("date").value;
+      $("err").textContent = "";
+      try {
+        [day, stats] = await Promise.all([
+          api("/api/day?date=" + date),
+          api("/api/stats?date=" + date),
+        ]);
+        render();
+      } catch (e) {
+        document.body.classList.remove("booting");
+        $("err").textContent = e.message;
+      }
+    }
+
+    function render() {
+      const shouldWelcome = !day.clock_in;
+      if (!hydrated) {
+        setScene(shouldWelcome ? "welcome" : "desk", false);
+        hydrated = true;
+      } else if (shouldWelcome) {
+        setScene("welcome", false);
+      } else if (document.body.classList.contains("welcome")) {
+        setScene("desk", enterFromPunch);
+      }
+      enterFromPunch = false;
+
+      const run = day.segments.find((s) => s.running);
+      const focusing = Boolean(run);
+      const resting = run?.kind === "rest";
+      const done = Boolean(day.clock_out);
+      $("dayLabel").textContent = $("date").value === todayISO() ? "今日" : $("date").value;
+      $("todayPunch").textContent = fmtHm(stats.today.punch_minutes);
+      $("todayWork").textContent = fmtHm(stats.today.work_minutes);
+      $("todayRest").textContent = fmtHm(stats.today.rest_minutes);
+      $("weekPunch").textContent = fmtHm(stats.week.punch_minutes);
+      $("hero").classList.toggle("is-focus", focusing);
+      $("hero").classList.toggle("tile-dark", resting);
+      $("segTile").classList.toggle("tile-dark-2", resting);
+      const line = applyPeriod();
+      $("heroTitle").textContent = shouldWelcome
+        ? line.welcome[0]
+        : resting ? "休息入定" : focusing ? "工作入定" : (done ? line.done[0] : line.desk[0]);
+      $("heroLead").textContent = shouldWelcome
+        ? line.welcome[1]
+        : resting ? "这一段也算上班。" : focusing ? (run.task || "工作") : (done ? line.done[1] : line.desk[1]);
+      $("taskRow").classList.toggle("hidden", shouldWelcome || focusing || done);
+      $("in").classList.toggle("hidden", Boolean(day.clock_in));
+      $("in").textContent = "上班打卡";
+      $("startWork").classList.toggle("hidden", done || (focusing && !resting));
+      $("startWork").textContent = resting ? "继续工作" : "开始工作";
+      $("startRest").classList.toggle("hidden", done || resting);
+      $("out").disabled = !day.clock_in || done;
+      $("resetOut").disabled = !done;
+      $("startWork").disabled = done;
+      $("startRest").disabled = done;
+      if (document.activeElement !== $("inTime")) $("inTime").value = hhmm(day.clock_in);
+      if (document.activeElement !== $("outTime")) $("outTime").value = hhmm(day.clock_out);
+      if (document.activeElement !== $("note")) $("note").value = day.note;
+      $("segs").innerHTML = day.segments.length
+        ? day.segments.map((s) => `
+          <li>
+            <span class="${s.kind === "rest" ? "kind-rest" : ""}">${esc(s.kind === "rest" ? "休息" : s.task)}</span>
+            <span>${hhmm(s.start)} – ${s.end ? hhmm(s.end) : "进行中"} · ${fmtHm(s.minutes)}</span>
+          </li>
+        `).join("")
+        : '<li class="empty">还没有分段。开始工作或去休息，都会记下一笔。</li>';
+      tick();
+    }
+
+    function liveKindMinutes(kind) {
+      return day.segments
+        .filter((s) => (s.kind === "rest") === (kind === "rest"))
+        .reduce((n, s) => n + (s.running ? minutesSince(s.start) : s.minutes), 0);
+    }
+
+    function tick() {
+      if (!day || !day.clock_in) {
+        $("heroTitle").textContent = applyPeriod().welcome[0];
+        $("heroLead").textContent = applyPeriod().welcome[1];
+        $("punchRange").textContent = wallClock();
+        $("punchLive").textContent = $("date").value ? dateLine($("date").value) : "";
+        return;
+      }
+      const run = day.segments.find((s) => s.running);
+      const workMins = liveKindMinutes("work");
+      const restMins = liveKindMinutes("rest");
+      const punchMins = day.clock_in
+        ? (day.clock_out ? day.punch_minutes : minutesSince(day.clock_in))
+        : 0;
+      $("todayPunch").textContent = fmtHm(punchMins);
+      $("todayWork").textContent = fmtHm(workMins);
+      $("todayRest").textContent = fmtHm(restMins);
+      if (!day.clock_in) return;
+      if (run) {
+        $("punchRange").textContent = fmtHms(run.start);
+        $("punchLive").textContent =
+          `已上班 ${fmtHm(punchMins)} · 工作 ${fmtHm(workMins)} · 休息 ${fmtHm(restMins)}`;
+        $("segLive").textContent = run.kind === "rest"
+          ? `休息已进行 ${fmtHm(minutesSince(run.start))}`
+          : `${run.task} 已进行 ${fmtHm(minutesSince(run.start))}`;
+        return;
+      }
+      if (day.clock_out) {
+        $("punchRange").textContent = `${hhmm(day.clock_in)} – ${hhmm(day.clock_out)}`;
+        $("punchLive").textContent = "今日已下班";
+      } else {
+        $("punchRange").textContent = fmtHms(day.clock_in);
+        $("punchLive").textContent =
+          `已上班 ${fmtHm(punchMins)} · 工作 ${fmtHm(workMins)} · 休息 ${fmtHm(restMins)}`;
+      }
+      $("segLive").textContent = "";
+    }
+
+    async function post(path, body) {
+      $("err").textContent = "";
+      try {
+        day = await api(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: $("date").value, ...body }),
+        });
+        stats = await api("/api/stats?date=" + $("date").value);
+        render();
+      } catch (e) {
+        enterFromPunch = false;
+        $("err").textContent = e.message;
+      }
+    }
+
+    $("date").value = todayISO();
+    $("prev").onclick = () => { $("date").value = shiftDate($("date").value, -1); refresh(); };
+    $("next").onclick = () => { $("date").value = shiftDate($("date").value, 1); refresh(); };
+    $("date").onchange = refresh;
+    $("in").onclick = () => {
+      enterFromPunch = true;
+      post("/api/clock-in", {});
+    };
+    $("out").onclick = () => post("/api/clock-out", {});
+    $("resetOut").onclick = () => post("/api/reset-out", {});
+    $("calibrate").onclick = () => post("/api/calibrate", {
+      clock_in: $("inTime").value,
+      clock_out: $("outTime").value,
+    });
+    $("startWork").onclick = () => post("/api/segment/start", {
+      task: $("task").value || lastWorkTask(),
+      kind: "work",
+    });
+    $("startRest").onclick = () => post("/api/segment/start", { kind: "rest" });
+    $("task").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") post("/api/segment/start", {
+        task: $("task").value || lastWorkTask(),
+        kind: "work",
+      });
+    });
+    $("export").onclick = () => {
+      location.href = "/api/export?year=" + $("date").value.slice(0, 4);
+    };
+    $("note").addEventListener("input", () => {
+      $("saved").textContent = "保存中";
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(async () => {
+        try {
+          day = await api("/api/note", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ date: $("date").value, note: $("note").value }),
+          });
+          $("saved").textContent = "已保存";
+        } catch (e) {
+          $("err").textContent = e.message;
+        }
+      }, 400);
+    });
+    setInterval(tick, 1000);
+    refresh();
+  </script>
+</body>
+</html>

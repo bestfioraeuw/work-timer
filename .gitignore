@@ -1,3 +1,7 @@
+# Local clock data
+data/
+*.db
+
 # Dependencies
 node_modules/
 .venv/
