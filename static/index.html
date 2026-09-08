@@ -35,6 +35,7 @@
       --colors-hairline: #e0e0e0;
       --colors-divider-soft: rgba(0, 0, 0, 0.04);
       --rounded-none: 0;
+      --rounded-xs: 5px;
       --rounded-sm: 8px;
       --rounded-md: 11px;
       --rounded-lg: 18px;
@@ -64,9 +65,9 @@
     body.booting .tile,
     body.booting .sub-nav,
     body.booting .footer,
-    body.booting #export { opacity: 0; }
-    body.welcome { overflow: hidden; }
-    body.welcome .tile-hero { min-height: calc(100vh - 44px); }
+    body.booting .export-wrap { opacity: 0; }
+    body.welcome { overflow-x: hidden; }
+    body.welcome .tile-hero { min-height: calc(100vh - 96px); }
     body.welcome .desk-reveal {
       opacity: 0;
       visibility: hidden;
@@ -78,9 +79,8 @@
       overflow: hidden;
       border: 0;
     }
-    body.welcome .sub-nav { height: 0; min-height: 0; }
     body.welcome .desk-only,
-    body.welcome #export { display: none !important; }
+    body.welcome .export-wrap { display: none !important; }
     body.welcome:not(.booting) .tile-hero {
       animation: welcome-in 0.8s ease both;
     }
@@ -129,6 +129,34 @@
       justify-content: space-between;
       padding: 0 22px;
     }
+    .export-wrap { position: relative; }
+    .export-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      z-index: 21;
+      min-width: 200px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: var(--colors-canvas);
+      border: 1px solid var(--colors-hairline);
+      border-radius: var(--rounded-lg);
+    }
+    .export-menu button {
+      min-height: 44px;
+      padding: 11px 22px;
+      border-radius: var(--rounded-pill);
+      border: 1px solid var(--colors-hairline);
+      background: var(--colors-canvas);
+      color: var(--colors-primary);
+      cursor: pointer;
+      font-size: 17px;
+      font-weight: 400;
+      letter-spacing: -0.374px;
+    }
+    .export-menu button:active { transform: scale(0.95); }
     .global-nav a, .nav-brand {
       color: var(--colors-body-on-dark);
       text-decoration: none;
@@ -160,7 +188,95 @@
       line-height: 1.19;
       letter-spacing: 0.231px;
     }
-    .date-row { display: flex; align-items: center; gap: 20px; }
+    .date-row { position: relative; display: flex; align-items: center; gap: 20px; }
+    #calToggle {
+      min-width: 8.5rem;
+      text-align: center;
+      cursor: pointer;
+    }
+    .cal {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      z-index: 22;
+      width: 320px;
+      padding: 16px;
+      background: var(--colors-canvas);
+      border: 1px solid var(--colors-hairline);
+      border-radius: var(--rounded-lg);
+    }
+    .cal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 0 0 12px;
+    }
+    .cal-head h3 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.374px;
+    }
+    .cal-weekdays,
+    .cal-days {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+    .cal-weekdays span {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 400;
+      letter-spacing: -0.12px;
+      color: var(--colors-ink-muted-48);
+    }
+    .cal-day {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      min-height: 44px;
+      padding: 0;
+      border: 2px solid transparent;
+      border-radius: var(--rounded-sm);
+      background: transparent;
+      color: var(--colors-ink);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: -0.224px;
+    }
+    .cal-day:active { transform: scale(0.95); }
+    .cal-day.is-future,
+    .cal-day.is-other { color: var(--colors-ink-muted-48); }
+    .cal-day.is-today:not(.is-work) { border-color: var(--colors-hairline); }
+    .cal-day.is-current { border-color: var(--colors-primary-focus); }
+    .cal-mark {
+      display: block;
+      width: 12px;
+      height: 12px;
+      fill: currentColor;
+    }
+    .cal-day.is-work .cal-mark { color: var(--colors-primary); }
+    .cal-day.is-rest .cal-mark { color: var(--colors-ink-muted-80); }
+    .cal-legend {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 24px;
+      margin: 12px 0 0;
+      font-size: 12px;
+      font-weight: 400;
+      letter-spacing: -0.12px;
+      color: var(--colors-ink-muted-48);
+    }
+    .cal-legend span { display: inline-flex; align-items: center; gap: 8px; }
+    .cal-legend .is-work { color: var(--colors-primary); }
+    .cal-legend .is-rest { color: var(--colors-ink-muted-80); }
+    .cal #todayJump { display: block; width: 100%; margin-top: 4px; }
     .text-link {
       background: none;
       border: 0;
@@ -381,6 +497,30 @@
     }
     .segs li:first-child { border-top: 0; }
     .empty { color: var(--colors-body-muted); text-align: center; border: 0; justify-content: center; }
+    .day-chart { margin: 40px auto 0; max-width: 800px; }
+    .day-chart svg { display: block; width: 100%; height: auto; }
+    .day-chart .bar-work { fill: var(--colors-primary); }
+    .day-chart .bar-rest { fill: rgba(255, 255, 255, 0.28); }
+    .day-chart .bar-gap { fill: rgba(255, 255, 255, 0.1); }
+    .day-chart .chart-time { fill: var(--colors-body-muted); font-size: 12px; letter-spacing: -0.12px; }
+    .day-chart .chart-caption {
+      fill: var(--colors-body-on-dark);
+      font-size: 12px;
+      letter-spacing: -0.12px;
+    }
+    body:not(.review) #dayChart { display: none; }
+    body.is-leaving #segs,
+    body.is-leaving #taskRow,
+    body.is-leaving #startWork,
+    body.is-leaving #startRest,
+    body.is-leaving #out {
+      animation: fade-out 0.45s ease both;
+    }
+    body.review #dayChart { animation: fade 0.7s ease both; }
+    @keyframes fade-out {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
     .stats {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -444,6 +584,7 @@
       .stats { grid-template-columns: 1fr 1fr; }
       .sub-nav { height: auto; padding: 10px 16px; }
       .date-row { gap: 8px; }
+      .cal { width: min(320px, calc(100vw - 32px)); }
     }
     @media (max-width: 640px) {
       .tile { padding: 48px 16px; }
@@ -459,11 +600,19 @@
     @media (prefers-reduced-motion: reduce) {
       .button-primary:active,
       .button-secondary-pill:active,
+      .export-menu button:active,
+      .cal-day:active,
       .text-link:active { transform: none; }
       body.welcome:not(.booting) .tile-hero,
       body.is-entering .tile-hero,
       body.is-entering .desk-reveal,
-      body.is-entering .desk-only { animation: none; }
+      body.is-entering .desk-only,
+      body.is-leaving #segs,
+      body.is-leaving #taskRow,
+      body.is-leaving #startWork,
+      body.is-leaving #startRest,
+      body.is-leaving #out,
+      body.review #dayChart { animation: none; }
       .tile-hero { transition: none; }
     }
   </style>
@@ -471,14 +620,35 @@
 <body class="booting welcome">
   <header class="global-nav">
     <span class="nav-brand">工作钟</span>
-    <button id="export" class="button-primary" type="button">导出今年</button>
+    <div class="export-wrap" id="exportWrap">
+      <button id="export" class="button-primary" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="exportMenu">导出今年</button>
+      <div id="exportMenu" class="export-menu hidden" role="menu" hidden>
+        <button type="button" role="menuitem" data-format="md">Markdown</button>
+        <button type="button" role="menuitem" data-format="xlsx">Excel</button>
+      </div>
+    </div>
   </header>
-  <nav class="sub-nav desk-reveal">
+  <nav class="sub-nav">
     <h2 id="dayLabel">今日</h2>
-    <div class="date-row">
-      <button id="prev" class="text-link" type="button">前一天</button>
-      <input id="date" class="search-input" type="date" />
-      <button id="next" class="text-link" type="button">后一天</button>
+    <div class="date-row" id="calWrap">
+      <button id="calToggle" class="search-input" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="cal">今天</button>
+      <input id="date" class="hidden" type="date" />
+      <div class="cal hidden" id="cal" hidden>
+        <div class="cal-head">
+          <button id="prevMonth" class="text-link" type="button">上个月</button>
+          <h3 id="monthLabel">月</h3>
+          <button id="nextMonth" class="text-link" type="button">下个月</button>
+        </div>
+        <div class="cal-weekdays" aria-hidden="true">
+          <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+        </div>
+        <div id="calDays" class="cal-days"></div>
+        <p class="cal-legend">
+          <span class="is-work"><svg class="cal-mark" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="3.5"/></svg>工作</span>
+          <span class="is-rest"><svg class="cal-mark" viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="7" width="2.2" height="4"/><rect x="4.9" y="3.5" width="2.2" height="7.5"/><rect x="8.8" y="5.5" width="2.2" height="5.5"/></svg>休息</span>
+        </p>
+        <button id="todayJump" class="text-link" type="button">回到今天</button>
+      </div>
     </div>
   </nav>
 
@@ -509,9 +679,10 @@
 
   <section class="tile tile-dark desk-reveal" id="segTile">
     <div class="tile-inner">
-      <h2 class="display-lg">今天的段落</h2>
-      <p class="lead">工作一段、休息一段，都算上班。</p>
+      <h2 class="display-lg" id="segTitle">今天的段落</h2>
+      <p class="lead" id="segLead">工作一段、休息一段，都算上班。</p>
       <p class="live" id="segLive"></p>
+      <div id="dayChart" class="day-chart" hidden></div>
       <ul class="segs" id="segs"></ul>
     </div>
   </section>
@@ -527,10 +698,10 @@
 
   <section class="tile tile-note desk-reveal">
     <div class="tile-inner">
-      <h2 class="display-lg">今日工作</h2>
-      <p class="lead">写给年底的自己。</p>
+      <h2 class="display-lg" id="noteTitle">今日工作</h2>
+      <p class="lead" id="noteLead">写给年底的自己。</p>
       <textarea id="note" placeholder="今天做了什么、卡在哪、下一步"></textarea>
-      <p class="fine" id="saved">写完会自动保存。年底可一次导出，交给 AI 做年报。</p>
+      <p class="fine" id="saved">写完会自动保存。年底可导出 Markdown 或按行导出 Excel。</p>
     </div>
   </section>
 
@@ -546,11 +717,6 @@
     }[c]));
     const todayISO = () => {
       const d = new Date();
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    };
-    const shiftDate = (iso, days) => {
-      const d = new Date(iso + "T00:00:00");
-      d.setDate(d.getDate() + days);
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     };
     const fmtHm = (mins) => {
@@ -625,7 +791,103 @@
     let saveTimer = null;
     let hydrated = false;
     let enterFromPunch = false;
+    let leaveFromOut = false;
     let enterTimer = null;
+    let leaveTimer = null;
+    let punched = [];
+    let loadedYears = new Set();
+    let viewMonth = todayISO().slice(0, 7);
+
+    const tsMs = (ts) => new Date(ts.replace(" ", "T")).getTime();
+
+    function chartBlocks() {
+      const start = tsMs(day.clock_in);
+      const end = tsMs(day.clock_out);
+      const blocks = [];
+      let cursor = start;
+      for (const s of day.segments) {
+        const a = tsMs(s.start);
+        const b = s.end ? tsMs(s.end) : end;
+        if (a - cursor >= 60000) {
+          blocks.push({ kind: "gap", task: "未分段", start: cursor, end: a, minutes: Math.round((a - cursor) / 60000) });
+        }
+        blocks.push({
+          kind: s.kind === "rest" ? "rest" : "work",
+          task: s.kind === "rest" ? "休息" : (s.task || "工作"),
+          start: a,
+          end: b,
+          minutes: s.running ? minutesSince(s.start) : s.minutes,
+        });
+        cursor = Math.max(cursor, b);
+      }
+      if (end - cursor >= 60000) {
+        blocks.push({ kind: "gap", task: "未分段", start: cursor, end, minutes: Math.round((end - cursor) / 60000) });
+      }
+      if (!blocks.length) {
+        blocks.push({
+          kind: "gap",
+          task: "在岗，未写分段",
+          start,
+          end,
+          minutes: day.punch_minutes,
+        });
+      }
+      return { start, end, blocks };
+    }
+
+    function renderChart() {
+      const el = $("dayChart");
+      if (!day.clock_out) {
+        el.innerHTML = "";
+        el.hidden = true;
+        return;
+      }
+      const { start, end, blocks } = chartBlocks();
+      const span = Math.max(end - start, 1);
+      const W = 800;
+      const axis = 16;
+      const barY = 28;
+      const barH = 32;
+      const parts = blocks.map((b) => {
+        const x = ((b.start - start) / span) * W;
+        const w = Math.max(((b.end - start) / span) * W - x, 2);
+        const cls = b.kind === "rest" ? "rest" : b.kind === "gap" ? "gap" : "work";
+        const label = w > 56
+          ? `<text class="chart-caption" x="${x + 8}" y="${barY + 21}">${esc(b.task)}</text>`
+          : "";
+        return `<g>
+          <title>${esc(b.task)} ${fmtHm(b.minutes)}</title>
+          <rect class="bar-${cls}" x="${x.toFixed(2)}" y="${barY}" width="${w.toFixed(2)}" height="${barH}" rx="8"/>
+          ${label}
+        </g>`;
+      });
+      el.hidden = false;
+      el.innerHTML = `<svg viewBox="0 0 ${W} 80" role="img" aria-label="当天工作时间轴">
+        <text class="chart-time" x="0" y="${axis}">${hhmm(day.clock_in)}</text>
+        <text class="chart-time" x="${W}" y="${axis}" text-anchor="end">${hhmm(day.clock_out)}</text>
+        ${parts.join("")}
+      </svg>`;
+    }
+
+    function applyReview(animateOut) {
+      const done = Boolean(day.clock_out);
+      clearTimeout(leaveTimer);
+      if (animateOut && done) {
+        document.body.classList.remove("review");
+        document.body.classList.add("is-leaving");
+        renderChart();
+        leaveTimer = setTimeout(() => {
+          document.body.classList.remove("is-leaving");
+          document.body.classList.add("review");
+          renderChart();
+          if (!(day.note || "").trim()) $("note").focus();
+        }, 450);
+        return;
+      }
+      document.body.classList.remove("is-leaving");
+      document.body.classList.toggle("review", done);
+      renderChart();
+    }
 
     function setScene(name, animate) {
       const welcome = name === "welcome";
@@ -651,6 +913,79 @@
       return data;
     }
 
+    async function loadPunched(year, force) {
+      year = String(year);
+      if (!force && loadedYears.has(year)) return;
+      const data = await api("/api/punched?year=" + year);
+      punched = punched.filter((d) => d.slice(0, 4) !== year).concat(data.dates || []);
+      loadedYears.add(year);
+    }
+
+    function shiftMonth(ym, delta) {
+      const [y, m] = ym.split("-").map(Number);
+      const d = new Date(y, m - 1 + delta, 1);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+    }
+
+    async function loadViewYears(force) {
+      const years = new Set(monthCells(viewMonth).map((iso) => iso.slice(0, 4)));
+      for (const year of years) await loadPunched(year, force);
+    }
+
+    function monthCells(ym) {
+      const [y, m] = ym.split("-").map(Number);
+      const first = new Date(y, m - 1, 1);
+      const padLeft = (first.getDay() + 6) % 7;
+      const start = new Date(y, m - 1, 1 - padLeft);
+      const cells = [];
+      for (let i = 0; i < 42; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        cells.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+      }
+      return cells;
+    }
+
+    function dayKind(iso, today) {
+      if (punched.includes(iso)) return "work";
+      if (iso < today) return "rest";
+      return iso === today ? "today" : "future";
+    }
+
+    const MARK_WORK = '<svg class="cal-mark" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="3.5"/></svg>';
+    const MARK_REST = '<svg class="cal-mark" viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="7" width="2.2" height="4"/><rect x="4.9" y="3.5" width="2.2" height="7.5"/><rect x="8.8" y="5.5" width="2.2" height="5.5"/></svg>';
+
+    function renderCal() {
+      const today = todayISO();
+      const current = $("date").value;
+      const [y, m] = viewMonth.split("-");
+      $("monthLabel").textContent = `${Number(y)}年${Number(m)}月`;
+      $("calToggle").textContent = current === today ? "今天" : `${Number(current.slice(5, 7))}月${Number(current.slice(8, 10))}日`;
+      $("calDays").innerHTML = monthCells(viewMonth).map((iso) => {
+        const kind = dayKind(iso, today);
+        const other = iso.slice(0, 7) !== viewMonth ? " is-other" : "";
+        const cur = iso === current ? " is-current" : "";
+        const todayCls = iso === today ? " is-today" : "";
+        const kindCls = kind === "work" ? " is-work" : kind === "rest" ? " is-rest" : kind === "future" ? " is-future" : "";
+        const label = kind === "work" ? "工作" : kind === "rest" ? "休息" : iso === today ? "今天" : "";
+        const mark = kind === "work" ? MARK_WORK : kind === "rest" ? MARK_REST : "";
+        return `<button type="button" class="cal-day${kindCls}${other}${todayCls}${cur}" data-date="${iso}" aria-label="${iso} ${label}"><span>${Number(iso.slice(8, 10))}</span>${mark}</button>`;
+      }).join("");
+    }
+
+    function closeCal() {
+      $("cal").classList.add("hidden");
+      $("cal").hidden = true;
+      $("calToggle").setAttribute("aria-expanded", "false");
+    }
+
+    function openCal() {
+      $("cal").classList.remove("hidden");
+      $("cal").hidden = false;
+      $("calToggle").setAttribute("aria-expanded", "true");
+      renderCal();
+    }
+
     async function refresh() {
       const date = $("date").value;
       $("err").textContent = "";
@@ -658,8 +993,10 @@
         [day, stats] = await Promise.all([
           api("/api/day?date=" + date),
           api("/api/stats?date=" + date),
+          loadViewYears(),
         ]);
         render();
+        renderCal();
       } catch (e) {
         document.body.classList.remove("booting");
         $("err").textContent = e.message;
@@ -682,19 +1019,40 @@
       const focusing = Boolean(run);
       const resting = run?.kind === "rest";
       const done = Boolean(day.clock_out);
-      $("dayLabel").textContent = $("date").value === todayISO() ? "今日" : $("date").value;
+      const isToday = $("date").value === todayISO();
+      $("dayLabel").textContent = isToday ? "今日" : $("date").value;
       $("todayPunch").textContent = fmtHm(stats.today.punch_minutes);
       $("todayWork").textContent = fmtHm(stats.today.work_minutes);
       $("todayRest").textContent = fmtHm(stats.today.rest_minutes);
       $("weekPunch").textContent = fmtHm(stats.week.punch_minutes);
+      $("segTitle").textContent = done
+        ? (isToday ? "今天做了什么" : "这天做了什么")
+        : "今天的段落";
+      $("segLead").textContent = done
+        ? "从上班到下班，按时间排开。"
+        : "工作一段、休息一段，都算上班。";
+      $("noteTitle").textContent = isToday ? "今日工作" : "这天的总结";
+      $("noteLead").textContent = done
+        ? ((day.note || "").trim()
+          ? "这天记下的总结。"
+          : "对着上面的时间轴，写几句做成了什么、卡在哪。")
+        : "写给年底的自己。";
+      const shouldLeave = leaveFromOut && done;
+      leaveFromOut = false;
+      applyReview(shouldLeave);
       $("hero").classList.toggle("is-focus", focusing);
       $("hero").classList.toggle("tile-dark", resting);
       $("segTile").classList.toggle("tile-dark-2", resting);
       const line = applyPeriod();
-      $("heroTitle").textContent = shouldWelcome
+      const rested = shouldWelcome && $("date").value < todayISO();
+      $("heroTitle").textContent = rested
+        ? "这天休息"
+        : shouldWelcome
         ? line.welcome[0]
         : resting ? "休息入定" : focusing ? "工作入定" : (done ? line.done[0] : line.desk[0]);
-      $("heroLead").textContent = shouldWelcome
+      $("heroLead").textContent = rested
+        ? "没有打卡，就算休息。"
+        : shouldWelcome
         ? line.welcome[1]
         : resting ? "这一段也算上班。" : focusing ? (run.task || "工作") : (done ? line.done[1] : line.desk[1]);
       $("taskRow").classList.toggle("hidden", shouldWelcome || focusing || done);
@@ -729,8 +1087,13 @@
 
     function tick() {
       if (!day || !day.clock_in) {
-        $("heroTitle").textContent = applyPeriod().welcome[0];
-        $("heroLead").textContent = applyPeriod().welcome[1];
+        if ($("date").value < todayISO()) {
+          $("heroTitle").textContent = "这天休息";
+          $("heroLead").textContent = "没有打卡，就算休息。";
+        } else {
+          $("heroTitle").textContent = applyPeriod().welcome[0];
+          $("heroLead").textContent = applyPeriod().welcome[1];
+        }
         $("punchRange").textContent = wallClock();
         $("punchLive").textContent = $("date").value ? dateLine($("date").value) : "";
         return;
@@ -756,7 +1119,7 @@
       }
       if (day.clock_out) {
         $("punchRange").textContent = `${hhmm(day.clock_in)} – ${hhmm(day.clock_out)}`;
-        $("punchLive").textContent = "今日已下班";
+        $("punchLive").textContent = $("date").value === todayISO() ? "今日已下班" : "这天已下班";
       } else {
         $("punchRange").textContent = fmtHms(day.clock_in);
         $("punchLive").textContent =
@@ -774,22 +1137,56 @@
           body: JSON.stringify({ date: $("date").value, ...body }),
         });
         stats = await api("/api/stats?date=" + $("date").value);
+        await loadViewYears(true);
         render();
+        renderCal();
       } catch (e) {
         enterFromPunch = false;
+        leaveFromOut = false;
         $("err").textContent = e.message;
       }
     }
 
     $("date").value = todayISO();
-    $("prev").onclick = () => { $("date").value = shiftDate($("date").value, -1); refresh(); };
-    $("next").onclick = () => { $("date").value = shiftDate($("date").value, 1); refresh(); };
-    $("date").onchange = refresh;
+    $("calToggle").onclick = (e) => {
+      e.stopPropagation();
+      if ($("cal").classList.contains("hidden")) openCal();
+      else closeCal();
+    };
+    $("todayJump").onclick = () => {
+      $("date").value = todayISO();
+      viewMonth = $("date").value.slice(0, 7);
+      closeCal();
+      refresh();
+    };
+    $("prevMonth").onclick = async () => {
+      viewMonth = shiftMonth(viewMonth, -1);
+      await loadViewYears();
+      renderCal();
+    };
+    $("nextMonth").onclick = async () => {
+      viewMonth = shiftMonth(viewMonth, 1);
+      await loadViewYears();
+      renderCal();
+    };
+    $("calDays").onclick = (e) => {
+      const picked = e.target.closest("[data-date]")?.dataset.date;
+      if (!picked) return;
+      if (picked !== $("date").value) {
+        $("date").value = picked;
+        viewMonth = picked.slice(0, 7);
+        refresh();
+      }
+      closeCal();
+    };
     $("in").onclick = () => {
       enterFromPunch = true;
       post("/api/clock-in", {});
     };
-    $("out").onclick = () => post("/api/clock-out", {});
+    $("out").onclick = () => {
+      leaveFromOut = true;
+      post("/api/clock-out", {});
+    };
     $("resetOut").onclick = () => post("/api/reset-out", {});
     $("calibrate").onclick = () => post("/api/calibrate", {
       clock_in: $("inTime").value,
@@ -806,9 +1203,38 @@
         kind: "work",
       });
     });
-    $("export").onclick = () => {
-      location.href = "/api/export?year=" + $("date").value.slice(0, 4);
+    const closeExport = () => {
+      $("exportMenu").classList.add("hidden");
+      $("exportMenu").hidden = true;
+      $("export").setAttribute("aria-expanded", "false");
     };
+    $("export").onclick = (e) => {
+      e.stopPropagation();
+      const open = $("exportMenu").classList.contains("hidden");
+      if (open) {
+        $("exportMenu").classList.remove("hidden");
+        $("exportMenu").hidden = false;
+        $("export").setAttribute("aria-expanded", "true");
+      } else {
+        closeExport();
+      }
+    };
+    $("exportMenu").onclick = (e) => {
+      const fmt = e.target.closest("[data-format]")?.dataset.format;
+      if (!fmt) return;
+      closeExport();
+      location.href = "/api/export?year=" + $("date").value.slice(0, 4) + "&format=" + fmt;
+    };
+    document.addEventListener("click", (e) => {
+      if (!$("exportWrap").contains(e.target)) closeExport();
+      if (!$("calWrap").contains(e.target)) closeCal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closeExport();
+        closeCal();
+      }
+    });
     $("note").addEventListener("input", () => {
       $("saved").textContent = "保存中";
       clearTimeout(saveTimer);

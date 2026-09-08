@@ -10,10 +10,13 @@ import sqlite3
 import subprocess
 import sys
 import webbrowser
+import zipfile
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from io import BytesIO
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+from xml.sax.saxutils import escape
 
 ROOT = Path(__file__).resolve().parent
 DB = ROOT / "data" / "clock.db"
@@ -337,8 +340,14 @@ def save_note(con: sqlite3.Connection, day: str, note: str) -> dict:
     return day_payload(con, day)
 
 
-def render_export(con: sqlite3.Connection, year: int, until: str | None = None) -> str:
-    until = until or now_ts()
+EXPORT_HEADERS = ("日期", "类型", "事项", "开始", "结束", "时长分钟", "上班", "下班", "日报")
+
+
+def hhmm(ts: str | None) -> str:
+    return ts[11:16] if ts else ""
+
+
+def recorded_days(con: sqlite3.Connection, year: int):
     start, end = f"{year}-01-01", f"{year}-12-31"
     days = con.execute(
         """
@@ -353,6 +362,158 @@ def render_export(con: sqlite3.Connection, year: int, until: str | None = None) 
         """,
         (start, end),
     ).fetchall()
+    return start, end, days
+
+
+def punched_dates(con: sqlite3.Connection, year: int) -> list[str]:
+    start, end = f"{year}-01-01", f"{year}-12-31"
+    return [
+        row["date"]
+        for row in con.execute(
+            """
+            SELECT date FROM days
+            WHERE date BETWEEN ? AND ?
+              AND clock_in IS NOT NULL
+            ORDER BY date
+            """,
+            (start, end),
+        )
+    ]
+
+
+def export_rows(
+    con: sqlite3.Connection, year: int, until: str | None = None
+) -> list[tuple]:
+    until = until or now_ts()
+    _, _, days = recorded_days(con, year)
+    rows: list[tuple] = []
+    for row in days:
+        segs = con.execute(
+            "SELECT * FROM segments WHERE date = ? ORDER BY id", (row["date"],)
+        ).fetchall()
+        note = (row["note"] or "").strip()
+        punch_in, punch_out = hhmm(row["clock_in"]), hhmm(row["clock_out"])
+        if not segs:
+            rows.append(
+                (
+                    row["date"],
+                    "日报" if note else "打卡",
+                    "",
+                    "",
+                    "",
+                    0,
+                    punch_in,
+                    punch_out,
+                    note,
+                )
+            )
+            continue
+        for seg in segs:
+            rest = seg["kind"] == "rest"
+            rows.append(
+                (
+                    row["date"],
+                    "休息" if rest else "工作",
+                    "休息" if rest else (seg["task"] or ""),
+                    hhmm(seg["start"]),
+                    hhmm(seg["end"]) if seg["end"] else "进行中",
+                    segment_minutes(seg["start"], seg["end"], until),
+                    punch_in,
+                    punch_out,
+                    note,
+                )
+            )
+    return rows
+
+
+def _xlsx_text(value: object) -> str:
+    raw = "".join(
+        ch
+        for ch in str(value)
+        if ch in "\t\n\r" or ord(ch) >= 32
+    )
+    return escape(raw, {'"': "&quot;"})
+
+
+def _xlsx_col(index: int) -> str:
+    name = ""
+    while index:
+        index, rem = divmod(index - 1, 26)
+        name = chr(65 + rem) + name
+    return name
+
+
+def render_xlsx(headers: tuple[str, ...], rows: list[tuple]) -> bytes:
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+        '<cols>',
+        '<col min="1" max="1" width="12"/>',
+        '<col min="2" max="2" width="8"/>',
+        '<col min="3" max="3" width="20"/>',
+        '<col min="4" max="5" width="8"/>',
+        '<col min="6" max="6" width="10"/>',
+        '<col min="7" max="8" width="8"/>',
+        '<col min="9" max="9" width="40"/>',
+        "</cols>",
+        "<sheetData>",
+    ]
+    for r, values in enumerate((headers, *rows), start=1):
+        cells = []
+        for c, value in enumerate(values, start=1):
+            ref = f"{_xlsx_col(c)}{r}"
+            if isinstance(value, int):
+                cells.append(f'<c r="{ref}"><v>{value}</v></c>')
+            else:
+                cells.append(
+                    f'<c r="{ref}" t="inlineStr"><is>'
+                    f'<t xml:space="preserve">{_xlsx_text(value)}</t>'
+                    f"</is></c>"
+                )
+        lines.append(f'<row r="{r}">{"".join(cells)}</row>')
+    lines += ["</sheetData>", "</worksheet>"]
+    sheet = "".join(lines)
+    parts = {
+        "[Content_Types].xml": (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+            "</Types>"
+        ),
+        "_rels/.rels": (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+            "</Relationships>"
+        ),
+        "xl/workbook.xml": (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            '<sheets><sheet name="工作记录" sheetId="1" r:id="rId1"/></sheets>'
+            "</workbook>"
+        ),
+        "xl/_rels/workbook.xml.rels": (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+            "</Relationships>"
+        ),
+        "xl/worksheets/sheet1.xml": sheet,
+    }
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, content in parts.items():
+            zf.writestr(name, content.encode("utf-8"))
+    return buf.getvalue()
+
+
+def render_export(con: sqlite3.Connection, year: int, until: str | None = None) -> str:
+    until = until or now_ts()
+    start, end, days = recorded_days(con, year)
     totals = range_totals(con, start, end, until)
     lines = [
         f"# {year} 工作记录",
@@ -380,7 +541,7 @@ def render_export(con: sqlite3.Connection, year: int, until: str | None = None) 
         )
         clock = "未打卡"
         if row["clock_in"]:
-            clock = f"{row['clock_in'][11:16]} – {row['clock_out'][11:16] if row['clock_out'] else '进行中'}"
+            clock = f"{hhmm(row['clock_in'])} – {hhmm(row['clock_out']) or '进行中'}"
         lines += [
             f"## {row['date']}",
             "",
@@ -459,14 +620,30 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path == "/api/stats":
                 self._json(200, stats_payload(con, qs.get("date", [today()])[0]))
                 return
+            if parsed.path == "/api/punched":
+                year = int(qs.get("year", [str(date.today().year)])[0])
+                self._json(200, {"dates": punched_dates(con, year)})
+                return
             if parsed.path == "/api/export":
                 year = int(qs.get("year", [str(date.today().year)])[0])
-                text = render_export(con, year)
-                name = f"work-{year}.md"
+                fmt = (qs.get("format", ["md"])[0] or "md").lower()
+                if fmt in ("xlsx", "excel"):
+                    body = render_xlsx(EXPORT_HEADERS, export_rows(con, year))
+                    name = f"work-{year}.xlsx"
+                    ctype = (
+                        "application/vnd.openxmlformats-officedocument."
+                        "spreadsheetml.sheet"
+                    )
+                elif fmt in ("md", "markdown"):
+                    body = render_export(con, year).encode("utf-8")
+                    name = f"work-{year}.md"
+                    ctype = "text/markdown; charset=utf-8"
+                else:
+                    raise ValueError("导出格式为 md 或 xlsx")
                 self._send(
                     200,
-                    text.encode("utf-8"),
-                    "text/markdown; charset=utf-8",
+                    body,
+                    ctype,
                     {"Content-Disposition": f'attachment; filename="{name}"'},
                 )
                 return

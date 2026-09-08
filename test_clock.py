@@ -1,8 +1,11 @@
+import json
 from http.server import ThreadingHTTPServer
+from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Thread
 from urllib.request import Request, urlopen
+from zipfile import ZipFile
 
 import app
 
@@ -33,6 +36,18 @@ def test_minutes_and_export() -> None:
         assert "写需求 09:10–10:10" in text
         assert "打卡合计：9h" in text
         assert "工作合计：3h" in text
+
+        rows = app.export_rows(con, 2026, "2026-09-08 18:00:00")
+        assert [row[2] for row in rows] == ["写需求", "开发"]
+        assert rows[0][1] == "工作"
+        assert rows[0][5] == 60
+        assert rows[1][8] == "做完登录页"
+        xlsx = app.render_xlsx(app.EXPORT_HEADERS, rows)
+        assert xlsx.startswith(b"PK")
+        sheet = ZipFile(BytesIO(xlsx)).read("xl/worksheets/sheet1.xml").decode("utf-8")
+        assert "写需求" in sheet
+        assert "做完登录页" in sheet
+        assert app.punched_dates(con, 2026) == ["2026-09-08"]
         con.close()
 
 
@@ -47,6 +62,7 @@ def test_reset_and_calibrate() -> None:
         reset = app.reset_clock_out(con, "2026-09-08")
         assert reset["clock_out"] is None
         assert reset["segments"][0]["end"] is None
+        assert app.punched_dates(con, 2026) == ["2026-09-08"]
 
         tuned = app.calibrate(con, "2026-09-08", "09:15", "18:30")
         assert tuned["clock_in"] == "2026-09-08 09:15:00"
@@ -104,6 +120,11 @@ def test_http_roundtrip() -> None:
             assert "工作钟" in home
             assert "上班打卡" in home
             assert "还没走？" in home or "早上好" in home
+            assert 'data-format="md"' in home
+            assert 'data-format="xlsx"' in home
+            assert 'id="dayChart"' in home
+            assert 'id="calDays"' in home
+            assert 'id="calToggle"' in home
             photo = urlopen(base + "/img/period-night.jpg")
             assert photo.headers.get_content_type() == "image/jpeg"
             assert photo.read()[:2] == b"\xff\xd8"
@@ -114,6 +135,21 @@ def test_http_roundtrip() -> None:
             )
             body = urlopen(req).read().decode("utf-8")
             assert "clock_in" in body
+            md = urlopen(base + "/api/export?year=2026&format=md")
+            assert md.headers.get_content_type() == "text/markdown"
+            assert "工作记录" in md.read().decode("utf-8")
+            xlsx = urlopen(base + "/api/export?year=2026&format=xlsx")
+            assert "spreadsheetml" in (xlsx.headers.get_content_type() or "")
+            assert xlsx.read()[:2] == b"PK"
+            punched = json.loads(urlopen(base + "/api/punched?year=2026").read().decode())
+            assert punched["dates"] == ["2026-09-08"]
+            urlopen(Request(
+                base + "/api/clock-out",
+                data=b'{"date":"2026-09-08"}',
+                headers={"Content-Type": "application/json"},
+            ))
+            punched = json.loads(urlopen(base + "/api/punched?year=2026").read().decode())
+            assert punched["dates"] == ["2026-09-08"]
         finally:
             server.shutdown()
 
