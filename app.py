@@ -99,6 +99,35 @@ def segment_minutes(start: str, end: str | None, until: str) -> int:
     return minutes_between(start, end or until)
 
 
+def open_prev_date(con: sqlite3.Connection, day: str) -> str | None:
+    prev = (date.fromisoformat(day) - timedelta(days=1)).isoformat()
+    row = con.execute(
+        "SELECT clock_in, clock_out FROM days WHERE date = ?", (prev,)
+    ).fetchone()
+    if row and row["clock_in"] and not row["clock_out"]:
+        return prev
+    return None
+
+
+def recent_tasks(con: sqlite3.Connection, limit: int = 6) -> list[str]:
+    rows = con.execute(
+        """
+        SELECT task FROM segments
+        WHERE (kind IS NULL OR kind != 'rest') AND task != ''
+        ORDER BY id DESC
+        """
+    ).fetchall()
+    seen: list[str] = []
+    for row in rows:
+        name = row["task"]
+        if name in seen:
+            continue
+        seen.append(name)
+        if len(seen) >= limit:
+            break
+    return seen
+
+
 def day_payload(con: sqlite3.Connection, day: str, until: str | None = None) -> dict:
     ensure_day(con, day)
     row = con.execute("SELECT * FROM days WHERE date = ?", (day,)).fetchone()
@@ -139,6 +168,8 @@ def day_payload(con: sqlite3.Connection, day: str, until: str | None = None) -> 
         "rest_minutes": rest_minutes,
         "task_minutes": work_minutes,
         "segments": segments,
+        "recent_tasks": recent_tasks(con),
+        "open_prev": open_prev_date(con, day),
     }
 
 
@@ -267,16 +298,38 @@ def calibrate(
     return day_payload(con, day)
 
 
+def note_draft(con: sqlite3.Connection, day: str) -> str:
+    rows = con.execute(
+        """
+        SELECT task FROM segments
+        WHERE date = ? AND (kind IS NULL OR kind != 'rest') AND task != ''
+        ORDER BY id
+        """,
+        (day,),
+    ).fetchall()
+    names: list[str] = []
+    for row in rows:
+        if row["task"] not in names:
+            names.append(row["task"])
+    return "、".join(names)
+
+
 def clock_out(con: sqlite3.Connection, day: str, ts: str | None = None) -> dict:
     ensure_day(con, day)
-    row = con.execute("SELECT clock_in FROM days WHERE date = ?", (day,)).fetchone()
+    row = con.execute(
+        "SELECT clock_in, note FROM days WHERE date = ?", (day,)
+    ).fetchone()
     if not row["clock_in"]:
         raise ValueError("请先上班打卡")
-    stamp = ts or now_ts()
+    stamp = ts or (f"{day} 23:59:59" if day < today() else now_ts())
     con.execute("UPDATE days SET clock_out = ? WHERE date = ?", (stamp, day))
     con.execute(
         "UPDATE segments SET end = ? WHERE date = ? AND end IS NULL", (stamp, day)
     )
+    if not (row["note"] or "").strip():
+        draft = note_draft(con, day)
+        if draft:
+            con.execute("UPDATE days SET note = ? WHERE date = ?", (draft, day))
     con.commit()
     return day_payload(con, day)
 
