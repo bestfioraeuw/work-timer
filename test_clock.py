@@ -29,6 +29,7 @@ def test_minutes_and_export() -> None:
         assert day["task_minutes"] == 180
         assert [s["task"] for s in day["segments"]] == ["写需求", "开发"]
         assert day["segments"][0]["end"] == "2026-09-08 10:10:00"
+        assert day["recent_tasks"] == ["开发", "写需求"]
 
         text = app.render_export(con, 2026, "2026-09-08 18:00:00")
         assert "# 2026 工作记录" in text
@@ -101,10 +102,36 @@ def test_work_and_rest_modes() -> None:
         works = [s for s in day["segments"] if s["kind"] == "work"]
         assert [s["minutes"] for s in rests] == [20, 15]
         assert [s["task"] for s in works] == ["开发", "开发"]
+        assert day["recent_tasks"] == ["开发"]
         text = app.render_export(con, 2026, "2026-09-08 12:15:00")
         assert "休息合计：35m" in text
         assert "休息 10:00–10:20" in text
         assert "休息 12:00–12:15" in text
+        con.close()
+
+
+def test_open_prev_closes_at_day_end() -> None:
+    with TemporaryDirectory() as tmp:
+        con = app.connect(Path(tmp) / "prev.db")
+        app.clock_in(con, "2020-01-01", "2020-01-01 09:00:00")
+        app.start_segment(con, "2020-01-01", "开发", "2020-01-01 09:10:00")
+        assert app.day_payload(con, "2020-01-02")["open_prev"] == "2020-01-01"
+        closed = app.clock_out(con, "2020-01-01")
+        assert closed["clock_out"] == "2020-01-01 23:59:59"
+        assert closed["segments"][0]["end"] == "2020-01-01 23:59:59"
+        assert app.day_payload(con, "2020-01-02")["open_prev"] is None
+        assert closed["note"] == "开发"
+        con.close()
+
+
+def test_clock_out_keeps_written_note() -> None:
+    with TemporaryDirectory() as tmp:
+        con = app.connect(Path(tmp) / "note.db")
+        app.clock_in(con, "2020-01-03", "2020-01-03 09:00:00")
+        app.start_segment(con, "2020-01-03", "开发", "2020-01-03 09:10:00")
+        app.save_note(con, "2020-01-03", "自己写的")
+        out = app.clock_out(con, "2020-01-03", "2020-01-03 18:00:00")
+        assert out["note"] == "自己写的"
         con.close()
 
 
@@ -118,7 +145,12 @@ def test_http_roundtrip() -> None:
         try:
             home = urlopen(base + "/").read().decode("utf-8")
             assert "工作钟" in home
-            assert "上班打卡" in home
+            assert "开始今天" in home
+            assert "正在做什么" in home
+            assert 'id="taskChips"' in home
+            assert 'id="closePrev"' in home
+            assert 'aria-keyshortcuts="r"' in home
+            assert 'aria-keyshortcuts="o"' in home
             assert "还没走？" in home or "早上好" in home
             assert 'data-format="md"' in home
             assert 'data-format="xlsx"' in home
@@ -174,6 +206,8 @@ if __name__ == "__main__":
     test_minutes_and_export()
     test_reset_and_calibrate()
     test_work_and_rest_modes()
+    test_open_prev_closes_at_day_end()
+    test_clock_out_keeps_written_note()
     test_http_roundtrip()
     test_page_url_and_launcher()
     print("ok")

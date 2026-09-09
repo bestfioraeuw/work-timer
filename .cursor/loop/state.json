@@ -1,0 +1,18 @@
+{
+  "name": "product",
+  "started": "2026-09-09T01:29:00+08:00",
+  "deadline": "2026-09-09T04:29:00+08:00",
+  "tick": 9,
+  "debugFails": {},
+  "lastShip": "skip",
+  "target": "macos",
+  "weight": "tiny",
+  "tests": "ok",
+  "lastContextDoc": "context-003.md",
+  "contextThreshold": 0.85,
+  "exit": "deadline",
+  "exitRules": [
+    "same debug problem fails > 5",
+    "now >= deadline"
+  ]
+}

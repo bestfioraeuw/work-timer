@@ -11,9 +11,6 @@
       document.documentElement.setAttribute("data-period", p);
     })();
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
   <style>
     :root {
       --colors-primary: #0066cc;
@@ -47,14 +44,13 @@
       --spacing-xl: 32px;
       --spacing-xxl: 48px;
       --spacing-section: 80px;
-      --font-display: "SF Pro Display", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-text: "SF Pro Text", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-display: "SF Pro Display", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-text: "SF Pro Text", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; }
     body {
       font-family: var(--font-text);
-      font-feature-settings: "ss03";
       font-size: 17px;
       font-weight: 400;
       line-height: 1.44;
@@ -480,6 +476,37 @@
       margin: 0 0 24px;
     }
     .task-row .search-input { flex: 1 1 240px; max-width: 420px; }
+    .task-chips {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 24px;
+    }
+    .task-chip {
+      min-height: 44px;
+      padding: 12px 16px;
+      border-radius: var(--rounded-pill);
+      border: 1px solid var(--colors-hairline);
+      background: var(--colors-canvas);
+      color: var(--colors-ink);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: -0.224px;
+    }
+    .task-chip:active { transform: scale(0.95); }
+    .task-chip.is-on {
+      border-width: 2px;
+      border-color: var(--colors-primary-focus);
+    }
+    .tile-hero .task-chip {
+      border-color: rgba(255, 255, 255, 0.28);
+    }
+    .tune-toggle { margin-top: 48px; }
+    .tile-hero.is-focus .tune-toggle { display: none; }
+    .tile-hero .text-link { color: var(--colors-primary-on-dark); }
+    #closePrev { display: block; margin: 24px auto 0; }
     .segs {
       list-style: none;
       margin: 40px auto 0;
@@ -602,6 +629,7 @@
       .button-secondary-pill:active,
       .export-menu button:active,
       .cal-day:active,
+      .task-chip:active,
       .text-link:active { transform: none; }
       body.welcome:not(.booting) .tile-hero,
       body.is-entering .tile-hero,
@@ -656,19 +684,21 @@
     <div class="tile-inner">
       <p class="err" id="err"></p>
       <h1 class="display-lg" id="heroTitle">早上好</h1>
-      <p class="lead" id="heroLead">先打卡，再开始今天。</p>
+      <p class="lead" id="heroLead">写一件正在做的事，或空着开始。</p>
       <p class="clock" id="punchRange">00:00:00</p>
       <p class="live" id="punchLive"></p>
-      <div class="task-row desk-only" id="taskRow">
+      <div class="task-row" id="taskRow">
         <input id="task" class="search-input" type="text" placeholder="正在做什么" maxlength="80" />
       </div>
+      <div class="task-chips" id="taskChips" hidden></div>
       <div class="actions">
-        <button id="in" class="button-primary" type="button">上班打卡</button>
-        <button id="startWork" class="button-primary desk-only" type="button">开始工作</button>
-        <button id="startRest" class="button-secondary-pill desk-only" type="button">去休息</button>
-        <button id="out" class="button-secondary-pill desk-only" type="button">下班</button>
+        <button id="startWork" class="button-primary" type="button">开始今天</button>
+        <button id="startRest" class="button-secondary-pill desk-only" type="button" aria-keyshortcuts="r">去休息</button>
+        <button id="out" class="button-secondary-pill desk-only" type="button" aria-keyshortcuts="o">下班</button>
       </div>
-      <div class="calibrate desk-only" id="calibrateRow">
+      <button id="closePrev" class="text-link hidden" type="button">昨天还没下班</button>
+      <button id="tuneToggle" class="text-link tune-toggle desk-only" type="button">校准时间</button>
+      <div class="calibrate desk-only hidden" id="calibrateRow" hidden>
         <label>上班<input id="inTime" class="search-input" type="time" /></label>
         <label>下班<input id="outTime" class="search-input" type="time" /></label>
         <button id="calibrate" class="button-primary" type="button">校准</button>
@@ -719,6 +749,7 @@
       const d = new Date();
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     };
+    const onToday = () => $("date").value === todayISO();
     const fmtHm = (mins) => {
       const h = Math.floor(Math.max(0, mins) / 60);
       const m = Math.max(0, mins) % 60;
@@ -761,7 +792,7 @@
         done: ["中午收工了", "记下的都还在。"],
       },
       afternoon: {
-        welcome: ["下午好", "下午这段，从打卡开始。"],
+        welcome: ["下午好", "下午这段，写一件事就开始。"],
         desk: ["下午还在继续", "选一段工作，或先休息。"],
         done: ["下午收工了", "记下的都还在。"],
       },
@@ -1003,6 +1034,39 @@
       }
     }
 
+    function renderChips(done, run) {
+      const el = $("taskChips");
+      const tasks = day.recent_tasks || [];
+      if (done || !onToday() || !tasks.length) {
+        el.innerHTML = "";
+        el.hidden = true;
+        return;
+      }
+      const current = run && run.kind !== "rest" ? run.task : "";
+      el.hidden = false;
+      el.innerHTML = tasks.map((name) => {
+        const on = name === current ? " is-on" : "";
+        return `<button type="button" class="task-chip${on}" data-task="${esc(name)}">${esc(name)}</button>`;
+      }).join("");
+    }
+
+    function beginWork(name) {
+      if (!onToday()) return;
+      const task = (name ?? $("task").value).trim();
+      const run = day?.segments?.find((s) => s.running);
+      if (!day?.clock_in && !task) {
+        enterFromPunch = true;
+        post("/api/clock-in", {});
+        return;
+      }
+      if (run && run.kind !== "rest" && (task || lastWorkTask()) === run.task && !task) {
+        return;
+      }
+      enterFromPunch = !day?.clock_in;
+      $("task").value = "";
+      post("/api/segment/start", { task: task || lastWorkTask(), kind: "work" });
+    }
+
     function render() {
       const shouldWelcome = !day.clock_in;
       if (!hydrated) {
@@ -1055,13 +1119,18 @@
         : shouldWelcome
         ? line.welcome[1]
         : resting ? "这一段也算上班。" : focusing ? (run.task || "工作") : (done ? line.done[1] : line.desk[1]);
-      $("taskRow").classList.toggle("hidden", shouldWelcome || focusing || done);
-      $("in").classList.toggle("hidden", Boolean(day.clock_in));
-      $("in").textContent = "上班打卡";
-      $("startWork").classList.toggle("hidden", done || (focusing && !resting));
-      $("startWork").textContent = resting ? "继续工作" : "开始工作";
-      $("startRest").classList.toggle("hidden", done || resting);
+      $("taskRow").classList.toggle("hidden", done || !isToday);
+      $("startWork").classList.toggle("hidden", done || !isToday);
+      $("startWork").textContent = shouldWelcome
+        ? "开始今天"
+        : resting ? "继续工作" : focusing ? "换一件事" : "开始工作";
+      $("startRest").classList.toggle("hidden", done || resting || !isToday);
       $("out").disabled = !day.clock_in || done;
+      renderChips(done, run);
+      $("closePrev").classList.toggle(
+        "hidden",
+        !day.open_prev || $("date").value !== todayISO()
+      );
       $("resetOut").disabled = !done;
       $("startWork").disabled = done;
       $("startRest").disabled = done;
@@ -1179,29 +1248,72 @@
       }
       closeCal();
     };
-    $("in").onclick = () => {
-      enterFromPunch = true;
-      post("/api/clock-in", {});
-    };
     $("out").onclick = () => {
       leaveFromOut = true;
       post("/api/clock-out", {});
     };
+    $("closePrev").onclick = async () => {
+      const prev = day.open_prev;
+      if (!prev) return;
+      $("err").textContent = "";
+      try {
+        await api("/api/clock-out", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: prev }),
+        });
+        refresh();
+      } catch (e) {
+        $("err").textContent = e.message;
+      }
+    };
     $("resetOut").onclick = () => post("/api/reset-out", {});
+    $("tuneToggle").onclick = () => {
+      const open = $("calibrateRow").classList.contains("hidden");
+      $("calibrateRow").classList.toggle("hidden", !open);
+      $("calibrateRow").hidden = !open;
+    };
     $("calibrate").onclick = () => post("/api/calibrate", {
       clock_in: $("inTime").value,
       clock_out: $("outTime").value,
     });
-    $("startWork").onclick = () => post("/api/segment/start", {
-      task: $("task").value || lastWorkTask(),
-      kind: "work",
-    });
-    $("startRest").onclick = () => post("/api/segment/start", { kind: "rest" });
+    $("startWork").onclick = () => beginWork();
+    $("startRest").onclick = () => {
+      if (!onToday()) return;
+      post("/api/segment/start", { kind: "rest" });
+    };
+    $("taskChips").onclick = (e) => {
+      const name = e.target.closest("[data-task]")?.dataset.task;
+      if (!name) return;
+      $("task").value = name;
+      beginWork(name);
+    };
     $("task").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") post("/api/segment/start", {
-        task: $("task").value || lastWorkTask(),
-        kind: "work",
-      });
+      if (e.key === "Enter") beginWork();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const tag = (e.target && e.target.tagName) || "";
+      const typing = tag === "INPUT" || tag === "TEXTAREA";
+      if (e.key === "/" && !typing) {
+        if ($("taskRow").classList.contains("hidden")) return;
+        e.preventDefault();
+        $("task").focus();
+        return;
+      }
+      if (typing) return;
+      if (e.key === "r") {
+        if (document.body.classList.contains("welcome")) return;
+        if ($("startRest").classList.contains("hidden") || $("startRest").disabled) return;
+        e.preventDefault();
+        $("startRest").click();
+        return;
+      }
+      if (e.key === "o") {
+        if ($("out").disabled) return;
+        e.preventDefault();
+        $("out").click();
+      }
     });
     const closeExport = () => {
       $("exportMenu").classList.add("hidden");
